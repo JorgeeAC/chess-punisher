@@ -58,3 +58,30 @@ make harness
 ```
 
 The harness supports commands: `reset`, `log`, `clearlog`, `quit`.
+
+## Vision Preview (Raspberry Pi)
+
+Install camera dependencies on Raspberry Pi:
+
+```bash
+sudo apt install -y python3-opencv python3-numpy python3-picamera2
+```
+
+Run the preview:
+
+```bash
+make vision
+```
+
+Optional overrides:
+
+```bash
+STREAM_BACKEND=auto VISION_GRAY=0 VISION_W=640 VISION_H=480 VISION_FPS=20 make vision
+```
+
+If you are connected over SSH and want the window on the Pi monitor:
+
+```bash
+export DISPLAY=:0
+make vision
+```
