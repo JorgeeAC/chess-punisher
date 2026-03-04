@@ -24,6 +24,9 @@ from chess_punisher.engine.blunder_classifier import (
 )
 from chess_punisher.comms.punisher import PunishEvent, Punisher
 from chess_punisher.logging.game_logger import GameLogger, MoveLogEntry, format_entry
+from chess_punisher.observability import bind_correlation_id, configure_logging, get_logger
+
+LOGGER = get_logger(__name__)
 
 
 def _stockfish_path() -> Path:
@@ -74,6 +77,7 @@ def _build_parser() -> argparse.ArgumentParser:
 
 
 def main() -> int:
+    configure_logging()
     args = _build_parser().parse_args()
     board = chess.Board()
     thresholds: Thresholds = args.thresholds
@@ -96,104 +100,128 @@ def main() -> int:
         return 1
 
     print("Enter UCI moves (e.g. e2e4). Commands: reset, log, clearlog, quit")
-    try:
-        with chess.engine.SimpleEngine.popen_uci(str(stockfish_path)) as engine:
-            while True:
-                raw = input("> ").strip().lower()
-                if raw == "quit":
-                    return 0
-                if raw == "reset":
-                    board.reset()
-                    logger.reset()
-                    print("Board reset.")
-                    continue
-                if raw == "log":
-                    for entry in logger.tail(10):
-                        print(format_entry(entry))
-                    continue
-                if raw == "clearlog":
-                    logger.reset()
-                    print("Log cleared.")
-                    continue
-                if not raw:
-                    continue
+    with bind_correlation_id() as correlation_id:
+        LOGGER.info("move_harness_started", extra={"correlation_id": correlation_id})
+        try:
+            with chess.engine.SimpleEngine.popen_uci(str(stockfish_path)) as engine:
+                while True:
+                    raw = input("> ").strip().lower()
+                    if raw == "quit":
+                        LOGGER.info("move_harness_quit")
+                        return 0
+                    if raw == "reset":
+                        board.reset()
+                        logger.reset()
+                        LOGGER.info("board_reset")
+                        print("Board reset.")
+                        continue
+                    if raw == "log":
+                        for entry in logger.tail(10):
+                            print(format_entry(entry))
+                        continue
+                    if raw == "clearlog":
+                        logger.reset()
+                        LOGGER.info("log_cleared")
+                        print("Log cleared.")
+                        continue
+                    if not raw:
+                        continue
 
-                try:
-                    move = chess.Move.from_uci(raw)
-                except ValueError:
-                    print(f"Invalid UCI move: {raw}")
-                    continue
-                if move not in board.legal_moves:
-                    print(f"Illegal move: {raw}")
-                    continue
+                    try:
+                        move = chess.Move.from_uci(raw)
+                    except ValueError:
+                        LOGGER.warning("invalid_move_text", extra={"raw": raw})
+                        print(f"Invalid UCI move: {raw}")
+                        continue
+                    if move not in board.legal_moves:
+                        LOGGER.warning("illegal_move", extra={"move_uci": raw})
+                        print(f"Illegal move: {raw}")
+                        continue
 
-                mover_color = board.turn
-                mover_name = "white" if mover_color == chess.WHITE else "black"
+                    mover_color = board.turn
+                    mover_name = "white" if mover_color == chess.WHITE else "black"
 
-                try:
-                    eval_before = _evaluate_cp_for_color(
-                        board, mover_color, engine, time_limit_s
-                    )
-                    suggested = engine.play(
-                        board, chess.engine.Limit(time=time_limit_s)
-                    ).move
-                    if suggested is None:
-                        raise RuntimeError("Engine did not return a move.")
-                except RuntimeError as exc:
-                    print(f"Engine error: {exc}")
-                    return 1
-
-                # Compute mover-aware loss/classification through shared classifier utility.
-                try:
-                    loss, label = compute_cp_loss_for_mover(
-                        board_before=board,
-                        move=move,
-                        engine=engine,
-                        time_limit_s=time_limit_s,
-                    )
-                except ValueError as exc:
-                    print(f"Illegal move: {exc}")
-                    continue
-                except RuntimeError as exc:
-                    print(f"Engine error: {exc}")
-                    return 1
-
-                if thresholds != default_thresholds:
-                    label = classify_cp_loss(loss, thresholds=thresholds)
-
-                board_after = board.copy(stack=False)
-                board_after.push(move)
-                eval_after = _evaluate_cp_for_color(
-                    board_after, mover_color, engine, time_limit_s
-                )
-
-                entry = MoveLogEntry(
-                    move_uci=move.uci(),
-                    mover=mover_name,
-                    bestmove_uci=suggested.uci(),
-                    eval_before_cp=eval_before,
-                    eval_after_cp=eval_after,
-                    loss_cp=loss,
-                    classification=label,
-                )
-                logger.log_move(entry)
-                board.push(move)
-
-                print(format_entry(entry))
-
-                if label != "OK":
-                    punisher.trigger(
-                        PunishEvent(
-                            mover=mover_name,
-                            severity=label,
-                            move_uci=move.uci(),
-                            loss_cp=loss,
-                            bestmove_uci=suggested.uci(),
+                    try:
+                        eval_before = _evaluate_cp_for_color(
+                            board, mover_color, engine, time_limit_s
                         )
+                        suggested = engine.play(
+                            board, chess.engine.Limit(time=time_limit_s)
+                        ).move
+                        if suggested is None:
+                            raise RuntimeError("Engine did not return a move.")
+                    except RuntimeError as exc:
+                        LOGGER.error("engine_error_pre_move", extra={"error": str(exc)})
+                        print(f"Engine error: {exc}")
+                        return 1
+
+                    # Compute mover-aware loss/classification through shared classifier utility.
+                    try:
+                        loss, label = compute_cp_loss_for_mover(
+                            board_before=board,
+                            move=move,
+                            engine=engine,
+                            time_limit_s=time_limit_s,
+                        )
+                    except ValueError as exc:
+                        LOGGER.warning("illegal_move_rejected", extra={"error": str(exc)})
+                        print(f"Illegal move: {exc}")
+                        continue
+                    except RuntimeError as exc:
+                        LOGGER.error("engine_error_post_move", extra={"error": str(exc)})
+                        print(f"Engine error: {exc}")
+                        return 1
+
+                    if thresholds != default_thresholds:
+                        label = classify_cp_loss(loss, thresholds=thresholds)
+
+                    board_after = board.copy(stack=False)
+                    board_after.push(move)
+                    eval_after = _evaluate_cp_for_color(
+                        board_after, mover_color, engine, time_limit_s
                     )
-    except OSError as exc:
-        print(f"Engine error: failed to start Stockfish at '{stockfish_path}': {exc}")
-        return 1
+
+                    entry = MoveLogEntry(
+                        move_uci=move.uci(),
+                        mover=mover_name,
+                        bestmove_uci=suggested.uci(),
+                        eval_before_cp=eval_before,
+                        eval_after_cp=eval_after,
+                        loss_cp=loss,
+                        classification=label,
+                    )
+                    logger.log_move(entry)
+                    board.push(move)
+                    LOGGER.info(
+                        "move_classified",
+                        extra={
+                            "move_uci": entry.move_uci,
+                            "mover": entry.mover,
+                            "classification": entry.classification,
+                            "loss_cp": entry.loss_cp,
+                            "bestmove_uci": entry.bestmove_uci,
+                        },
+                    )
+
+                    print(format_entry(entry))
+
+                    if label != "OK":
+                        punisher.trigger(
+                            PunishEvent(
+                                mover=mover_name,
+                                severity=label,
+                                move_uci=move.uci(),
+                                loss_cp=loss,
+                                bestmove_uci=suggested.uci(),
+                            )
+                        )
+        except OSError as exc:
+            LOGGER.error(
+                "engine_start_failed",
+                extra={"stockfish_path": str(stockfish_path), "error": str(exc)},
+            )
+            print(f"Engine error: failed to start Stockfish at '{stockfish_path}': {exc}")
+            return 1
 
 
 if __name__ == "__main__":

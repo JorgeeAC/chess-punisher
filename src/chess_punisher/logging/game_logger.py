@@ -5,6 +5,10 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
+from chess_punisher.observability import get_logger
+
+LOGGER = get_logger(__name__)
+
 
 @dataclass(frozen=True)
 class MoveLogEntry:
@@ -46,7 +50,10 @@ class GameLogger:
             with self.log_path.open("a", encoding="utf-8") as f:
                 f.write(format_entry(entry) + "\n")
         except OSError as exc:
-            print(f"[LOG][WARN] unable to write {self.log_path}: {exc}")
+            LOGGER.warning(
+                "game_log_write_failed",
+                extra={"path": str(self.log_path), "error": str(exc)},
+            )
 
     def reset(self) -> None:
         self._entries.clear()

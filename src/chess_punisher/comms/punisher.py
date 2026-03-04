@@ -6,6 +6,10 @@ from dataclasses import dataclass
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
+from chess_punisher.observability import get_logger
+
+LOGGER = get_logger(__name__)
+
 
 @dataclass(frozen=True)
 class PunishEvent:
@@ -38,14 +42,15 @@ class Punisher:
 
     def trigger(self, event: PunishEvent) -> None:
         url = self.url_for_mover(event.mover)
-        print(
-            "[PUNISH] mover={} severity={} move={} loss={} url={}".format(
-                event.mover,
-                event.severity,
-                event.move_uci,
-                event.loss_cp,
-                url or "",
-            )
+        LOGGER.info(
+            "punish_trigger",
+            extra={
+                "mover": event.mover,
+                "severity": event.severity,
+                "move_uci": event.move_uci,
+                "loss_cp": event.loss_cp,
+                "url": url or "",
+            },
         )
 
         if self.dry_run or not url:
@@ -64,4 +69,4 @@ class Punisher:
             with urlopen(req, timeout=self.timeout_s):
                 pass
         except Exception as exc:
-            print(f"[PUNISH][WARN] request failed: {exc}")
+            LOGGER.warning("punish_request_failed", extra={"error": str(exc)})

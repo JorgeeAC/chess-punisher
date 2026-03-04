@@ -1,0 +1,7 @@
+app:
+  mode: sim
+  simulator: true
+vision:
+  source: replay
+actuation:
+  use_esp_sim: true

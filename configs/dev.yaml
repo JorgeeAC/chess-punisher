@@ -1,0 +1,13 @@
+app:
+  mode: dev
+  simulator: true
+logging:
+  level: INFO
+  json: true
+engine:
+  stockfish_path: /usr/games/stockfish
+  think_time_s: 0.15
+actuation:
+  protocol: mqtt
+  ack_timeout_s: 0.6
+  max_attempts: 3

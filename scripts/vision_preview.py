@@ -16,6 +16,9 @@ if str(SRC_PATH) not in sys.path:
     sys.path.insert(0, str(SRC_PATH))
 
 from chess_punisher.vision import VisionPreview
+from chess_punisher.observability import bind_correlation_id, configure_logging, get_logger
+
+LOGGER = get_logger(__name__)
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -34,58 +37,68 @@ def _build_parser() -> argparse.ArgumentParser:
 
 
 def main() -> int:
+    configure_logging()
     args = _build_parser().parse_args()
     gray_mode = bool(args.gray)
 
-    preview = VisionPreview(
-        backend=args.backend,
-        width=args.width,
-        height=args.height,
-        fps=args.fps,
-    )
-    print(f"[VISION] backend={preview.selected_backend} gray={int(gray_mode)}")
+    with bind_correlation_id() as correlation_id:
+        preview = VisionPreview(
+            backend=args.backend,
+            width=args.width,
+            height=args.height,
+            fps=args.fps,
+        )
+        LOGGER.info(
+            "vision_preview_started",
+            extra={
+                "correlation_id": correlation_id,
+                "backend": preview.selected_backend,
+                "gray_mode": int(gray_mode),
+            },
+        )
+        print(f"[VISION] backend={preview.selected_backend} gray={int(gray_mode)}")
 
-    window_name = "Chess Punisher Vision Preview"
-    last_t = time.perf_counter()
-    fps = 0.0
+        window_name = "Chess Punisher Vision Preview"
+        last_t = time.perf_counter()
+        fps = 0.0
 
-    try:
-        for frame in preview.frames():
-            now = time.perf_counter()
-            dt = now - last_t
-            if dt > 0:
-                fps = 0.9 * fps + 0.1 * (1.0 / dt)
-            last_t = now
+        try:
+            for frame in preview.frames():
+                now = time.perf_counter()
+                dt = now - last_t
+                if dt > 0:
+                    fps = 0.9 * fps + 0.1 * (1.0 / dt)
+                last_t = now
 
-            if gray_mode:
-                gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-                display = cv2.cvtColor(gray, cv2.COLOR_GRAY2BGR)
-                mode = "GRAY"
-            else:
-                display = frame
-                mode = "COLOR"
+                if gray_mode:
+                    gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+                    display = cv2.cvtColor(gray, cv2.COLOR_GRAY2BGR)
+                    mode = "GRAY"
+                else:
+                    display = frame
+                    mode = "COLOR"
 
-            cv2.putText(
-                display,
-                f"FPS: {fps:5.1f}  MODE: {mode}",
-                (10, 24),
-                cv2.FONT_HERSHEY_SIMPLEX,
-                0.65,
-                (0, 255, 0),
-                2,
-                cv2.LINE_AA,
-            )
-            cv2.imshow(window_name, display)
+                cv2.putText(
+                    display,
+                    f"FPS: {fps:5.1f}  MODE: {mode}",
+                    (10, 24),
+                    cv2.FONT_HERSHEY_SIMPLEX,
+                    0.65,
+                    (0, 255, 0),
+                    2,
+                    cv2.LINE_AA,
+                )
+                cv2.imshow(window_name, display)
 
-            key = cv2.waitKey(1) & 0xFF
-            if key == ord("q"):
-                break
-    except RuntimeError as exc:
-        print(f"[VISION][ERROR] {exc}")
-        return 1
-    finally:
-        preview.close()
-        cv2.destroyAllWindows()
+                key = cv2.waitKey(1) & 0xFF
+                if key == ord("q"):
+                    break
+        except RuntimeError:
+            LOGGER.error("vision_preview_failed", exc_info=True)
+            return 1
+        finally:
+            preview.close()
+            cv2.destroyAllWindows()
 
     return 0
 

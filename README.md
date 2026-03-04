@@ -2,6 +2,13 @@
 
 Minimal Python foundation for a future computer-vision + Stockfish project.
 
+The repo now includes initial scaffolding for:
+
+- structured observability logs (JSON + correlation IDs)
+- a lightweight orchestration state machine
+- actuator protocol message schemas
+- an ESP32 PlatformIO firmware skeleton
+
 ## Requirements
 
 - Python 3.10+
@@ -49,6 +56,16 @@ make smoke
 
 This executes `python -m scripts.stockfish_smoke`, runs a quick UCI analysis on the starting position, and prints an evaluation string.
 
+## App Skeleton
+
+Run:
+
+```bash
+make app
+```
+
+This boots the minimal orchestrator state machine and emits structured startup logs.
+
 ## Move Harness
 
 Run:
@@ -84,4 +101,20 @@ If you are connected over SSH and want the window on the Pi monitor:
 ```bash
 export DISPLAY=:0
 make vision
+```
+
+## Firmware (ESP32)
+
+The firmware scaffold lives in `firmware/esp32_actuator`.
+
+Build:
+
+```bash
+make fw-build
+```
+
+Flash (override serial port with `PORT` if needed):
+
+```bash
+PORT=/dev/ttyUSB0 make fw-flash
 ```

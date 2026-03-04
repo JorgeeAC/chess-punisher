@@ -1,0 +1,11 @@
+app:
+  mode: pi
+  simulator: false
+vision:
+  backend: auto
+  width: 640
+  height: 480
+  fps: 20
+mqtt:
+  host: 127.0.0.1
+  port: 1883

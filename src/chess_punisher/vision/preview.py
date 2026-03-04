@@ -7,6 +7,10 @@ from typing import Generator
 import cv2
 import numpy as np
 
+from chess_punisher.observability import get_logger
+
+LOGGER = get_logger(__name__)
+
 
 class VisionPreview:
     def __init__(
@@ -48,7 +52,7 @@ class VisionPreview:
             from picamera2 import Picamera2  # type: ignore
         except ImportError:
             if self.backend in {"auto", "picamera2"}:
-                print("[VISION][WARN] Picamera2 not installed; falling back to OpenCV.")
+                LOGGER.warning("Picamera2 not installed; falling back to OpenCV.")
             return False
 
         try:
@@ -61,8 +65,8 @@ class VisionPreview:
             picam2.start()
             self._picam2 = picam2
             return True
-        except Exception as exc:
-            print(f"[VISION][WARN] Picamera2 init failed: {exc}. Falling back to OpenCV.")
+        except Exception:
+            LOGGER.warning("Picamera2 init failed; falling back to OpenCV.", exc_info=True)
             self._picam2 = None
             return False
 
