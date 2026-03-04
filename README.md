@@ -76,6 +76,19 @@ make harness
 
 The harness supports commands: `reset`, `log`, `clearlog`, `quit`.
 
+Actuation modes:
+
+```bash
+# Existing HTTP punisher behavior (default)
+make harness
+
+# Simulator mode (no hardware)
+python -m scripts.move_harness --actuation-mode sim
+
+# MQTT mode (ESP over broker)
+python -m scripts.move_harness --actuation-mode mqtt --mqtt-host 127.0.0.1 --mqtt-port 1883 --mqtt-device-id esp32-1
+```
+
 ## Vision Preview (Raspberry Pi)
 
 Install camera dependencies on Raspberry Pi:

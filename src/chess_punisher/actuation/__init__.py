@@ -1,6 +1,7 @@
 """Actuation protocol and dispatch helpers."""
 
 from .mqtt_dispatcher import MqttCommandTracker, PendingCommand
+from .mqtt_adapter import MqttActuatorAdapter, PahoAckTransport
 from .protocol import (
     ACK_STATES,
     COMMAND_ACTIONS,
@@ -17,7 +18,9 @@ __all__ = [
     "COMMAND_ACTIONS",
     "ActuatorStatus",
     "CommandAck",
+    "MqttActuatorAdapter",
     "MqttCommandTracker",
+    "PahoAckTransport",
     "PendingCommand",
     "PunishCommand",
     "ack_topic",

@@ -1,0 +1,6 @@
+Metadata-Version: 2.4
+Name: chess-punisher
+Version: 0.0.1
+Requires-Python: >=3.10
+Requires-Dist: python-chess<2.0,>=1.999
+Requires-Dist: paho-mqtt<3.0,>=2.0

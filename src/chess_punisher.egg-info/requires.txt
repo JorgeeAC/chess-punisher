@@ -1,0 +1,2 @@
+python-chess<2.0,>=1.999
+paho-mqtt<3.0,>=2.0
