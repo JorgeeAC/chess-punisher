@@ -131,3 +131,40 @@ Flash (override serial port with `PORT` if needed):
 ```bash
 PORT=/dev/ttyUSB0 make fw-flash
 ```
+
+Open the serial monitor:
+
+```bash
+PORT=/dev/ttyUSB0 make fw-monitor
+```
+
+## Basic ESP32 <-> Raspberry Pi Confirmation
+
+The lowest-friction bring-up path in this repo is MQTT:
+
+1. Run an MQTT broker on the Raspberry Pi.
+   ```bash
+   sudo apt install -y mosquitto mosquitto-clients
+   sudo systemctl enable --now mosquitto
+   ```
+2. Point the ESP32 firmware at the Pi's IP by setting `MQTT_HOST` in `firmware/esp32_actuator/platformio.ini`, then flash the board from your PC.
+3. Keep the ESP32 plugged into USB and open the serial monitor:
+   ```bash
+   PORT=/dev/ttyUSB0 make fw-monitor
+   ```
+4. On the Raspberry Pi, run the probe:
+   ```bash
+   MQTT_HOST=127.0.0.1 MQTT_DEVICE_ID=esp32-1 make probe
+   ```
+
+What success looks like:
+
+- The Pi prints a retained `status:` line plus `ack: state=received` and `ack: state=executed`.
+- The ESP32 serial monitor prints Wi-Fi/MQTT connection messages and the matching command id.
+- Most ESP32 dev boards will also flash the built-in LED briefly on execution. If your board has no usable on-board LED, the MQTT ACKs still confirm communication.
+
+If you only want to confirm that the ESP32 is online on MQTT without sending a command:
+
+```bash
+python -m scripts.actuator_probe --mqtt-host 127.0.0.1 --mqtt-device-id esp32-1 --listen-only
+```

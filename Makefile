@@ -2,7 +2,7 @@ SHELL := /bin/bash
 PY := python
 PIP := pip
 
-.PHONY: help venv install freeze smoke harness vision app test fw-build fw-flash
+.PHONY: help venv install freeze smoke harness vision app probe test fw-build fw-flash fw-monitor
 
 help:
 	@echo "Targets:"
@@ -13,9 +13,11 @@ help:
 	@echo "  make harness   - run interactive move harness"
 	@echo "  make vision    - run live camera preview"
 	@echo "  make app       - run app skeleton with state machine bootstrap"
+	@echo "  make probe     - run basic MQTT ESP32 connectivity probe"
 	@echo "  make test      - run unit tests"
 	@echo "  make fw-build  - build ESP32 firmware (PlatformIO)"
 	@echo "  make fw-flash  - flash ESP32 firmware (PORT=/dev/ttyUSB0)"
+	@echo "  make fw-monitor - open ESP32 serial monitor (PORT=/dev/ttyUSB0)"
 
 venv:
 	$(PY) -m venv .venv
@@ -39,6 +41,9 @@ vision:
 app:
 	$(PY) -m chess_punisher.app.main
 
+probe:
+	$(PY) -m scripts.actuator_probe --mqtt-host $${MQTT_HOST:-127.0.0.1} --mqtt-port $${MQTT_PORT:-1883} --mqtt-device-id $${MQTT_DEVICE_ID:-esp32-1}
+
 test:
 	$(PY) -m unittest discover -s tests -p "test_*.py"
 
@@ -47,3 +52,6 @@ fw-build:
 
 fw-flash:
 	cd firmware/esp32_actuator && pio run -e esp32dev -t upload --upload-port $${PORT:-/dev/ttyUSB0}
+
+fw-monitor:
+	cd firmware/esp32_actuator && pio device monitor --port $${PORT:-/dev/ttyUSB0} --baud 115200

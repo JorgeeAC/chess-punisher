@@ -156,3 +156,18 @@ class ActuatorStatus:
     def to_json(self) -> str:
         return json.dumps(self.as_dict(), separators=(",", ":"))
 
+    @classmethod
+    def from_dict(cls, payload: dict[str, Any]) -> "ActuatorStatus":
+        return cls(
+            online=bool(payload["online"]),
+            firmware=str(payload["firmware"]),
+            last_command_id=str(payload["last_command_id"]),
+            rssi=int(payload["rssi"]) if payload.get("rssi") is not None else None,
+        )
+
+    @classmethod
+    def from_json(cls, raw: str) -> "ActuatorStatus":
+        payload = json.loads(raw)
+        if not isinstance(payload, dict):
+            raise ValueError("status payload must be a JSON object")
+        return cls.from_dict(payload)
