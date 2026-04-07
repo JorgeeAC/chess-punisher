@@ -18,6 +18,7 @@ pio run -e esp32dev -t upload --upload-port /dev/ttyUSB0
 
 ## Notes
 
-- Update `platformio.ini` `build_flags` with your Wi-Fi and broker settings.
-- This skeleton subscribes to `cp/actuators/<device_id>/cmd` and publishes ACK/status topics.
-- Servo control is intentionally left as a TODO in `src/main.cpp`.
+- Update `platformio.ini` `build_flags` with your Wi-Fi settings.
+- The firmware exposes `GET /health` and `GET /punish` on port 80.
+- `GET /punish` accepts query params like `severity`, `loss`, `move`, and optional `pulse_ms`.
+- The default bring-up behavior is a brief LED pulse plus serial logging in `src/main.cpp`.

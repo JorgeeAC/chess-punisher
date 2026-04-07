@@ -2,7 +2,6 @@
 
 from .mqtt_dispatcher import MqttCommandTracker, PendingCommand
 from .mqtt_adapter import MqttActuatorAdapter, PahoAckTransport
-from .probe import ProbeClient, ProbeResult, build_probe_command, run_probe
 from .protocol import (
     ACK_STATES,
     COMMAND_ACTIONS,
@@ -23,12 +22,8 @@ __all__ = [
     "MqttCommandTracker",
     "PahoAckTransport",
     "PendingCommand",
-    "ProbeClient",
-    "ProbeResult",
     "PunishCommand",
     "ack_topic",
     "command_topic",
-    "build_probe_command",
-    "run_probe",
     "status_topic",
 ]

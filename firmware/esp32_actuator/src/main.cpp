@@ -1,9 +1,7 @@
 #include <Arduino.h>
 #include <ArduinoJson.h>
-#include <PubSubClient.h>
+#include <WebServer.h>
 #include <WiFi.h>
-
-#include "protocol.h"
 
 #ifndef ACTUATOR_LED_PIN
 #define ACTUATOR_LED_PIN 2
@@ -13,12 +11,7 @@
 #define ACTUATOR_ACTIVE_HIGH 1
 #endif
 
-WiFiClient wifi_client;
-PubSubClient mqtt_client(wifi_client);
-
-char cmd_topic[96];
-char ack_topic[96];
-char status_topic[96];
+WebServer server(80);
 
 void set_indicator(bool on) {
 #if ACTUATOR_ACTIVE_HIGH
@@ -34,85 +27,68 @@ void blink_indicator(unsigned int pulse_ms) {
   set_indicator(false);
 }
 
-void publish_status(bool online, const char *last_command_id) {
+void send_json(int status_code, JsonDocument &doc) {
+  char payload[320];
+  serializeJson(doc, payload, sizeof(payload));
+  server.send(status_code, "application/json", payload);
+}
+
+int read_pulse_ms() {
+  if (!server.hasArg("pulse_ms")) {
+    return 150;
+  }
+  int pulse_ms = server.arg("pulse_ms").toInt();
+  if (pulse_ms < 20 || pulse_ms > 2000) {
+    return 150;
+  }
+  return pulse_ms;
+}
+
+void handle_health() {
   StaticJsonDocument<192> doc;
-  doc["online"] = online;
-  doc["firmware"] = "0.1.0";
-  doc["last_command_id"] = last_command_id;
+  doc["ok"] = true;
+  doc["device_id"] = DEVICE_ID;
+  doc["ip"] = WiFi.localIP().toString();
   doc["rssi"] = WiFi.RSSI();
-
-  char payload[192];
-  size_t n = serializeJson(doc, payload, sizeof(payload));
-  mqtt_client.publish(status_topic, payload, n, true);
+  send_json(200, doc);
 }
 
-void publish_ack(const char *command_id, const char *state, const char *error = "") {
-  StaticJsonDocument<192> doc;
-  doc["command_id"] = command_id;
-  doc["state"] = state;
-  doc["ts_ms"] = millis();
-  if (strlen(error) > 0) {
-    doc["error"] = error;
-  }
+void handle_punish() {
+  String severity = server.hasArg("severity") ? server.arg("severity") : "TEST";
+  String move = server.hasArg("move") ? server.arg("move") : "";
+  String loss = server.hasArg("loss") ? server.arg("loss") : "0";
+  int pulse_ms = read_pulse_ms();
 
-  char payload[192];
-  size_t n = serializeJson(doc, payload, sizeof(payload));
-  mqtt_client.publish(ack_topic, payload, n, false);
-}
-
-void callback(char *topic, byte *payload, unsigned int length) {
-  if (strcmp(topic, cmd_topic) != 0) {
-    return;
-  }
-
-  StaticJsonDocument<384> doc;
-  auto err = deserializeJson(doc, payload, length);
-  if (err) {
-    publish_ack("unknown", "rejected", "invalid_json");
-    return;
-  }
-
-  const char *command_id = doc["command_id"] | "";
-  if (strlen(command_id) == 0) {
-    publish_ack("unknown", "rejected", "missing_command_id");
-    return;
-  }
-  unsigned int pulse_ms = doc["pulse_ms"] | 120;
-  if (pulse_ms == 0 || pulse_ms > 2000) {
-    pulse_ms = 120;
-  }
-
-  Serial.printf("command received: %s\n", command_id);
-  publish_ack(command_id, "received");
-
-  // Visual confirmation for bring-up before servo control is wired in.
+  Serial.printf(
+      "punish severity=%s move=%s loss=%s pulse_ms=%d\n",
+      severity.c_str(),
+      move.c_str(),
+      loss.c_str(),
+      pulse_ms);
   blink_indicator(pulse_ms);
-  Serial.printf("command executed: %s\n", command_id);
-  publish_ack(command_id, "executed");
-  publish_status(true, command_id);
+
+  StaticJsonDocument<224> doc;
+  doc["ok"] = true;
+  doc["device_id"] = DEVICE_ID;
+  doc["severity"] = severity;
+  doc["move"] = move;
+  doc["loss"] = loss;
+  doc["pulse_ms"] = pulse_ms;
+  send_json(200, doc);
 }
 
-void ensure_mqtt() {
-  while (!mqtt_client.connected()) {
-    if (mqtt_client.connect(DEVICE_ID)) {
-      mqtt_client.subscribe(cmd_topic, 1);
-      Serial.printf("mqtt connected, subscribed to %s\n", cmd_topic);
-      publish_status(true, "none");
-      break;
-    }
-    Serial.println("mqtt connect retry");
-    delay(500);
-  }
+void handle_not_found() {
+  StaticJsonDocument<160> doc;
+  doc["ok"] = false;
+  doc["error"] = "not_found";
+  doc["path"] = server.uri();
+  send_json(404, doc);
 }
 
 void setup() {
   Serial.begin(115200);
   pinMode(ACTUATOR_LED_PIN, OUTPUT);
   set_indicator(false);
-
-  snprintf(cmd_topic, sizeof(cmd_topic), COMMAND_TOPIC_TEMPLATE, DEVICE_ID);
-  snprintf(ack_topic, sizeof(ack_topic), ACK_TOPIC_TEMPLATE, DEVICE_ID);
-  snprintf(status_topic, sizeof(status_topic), STATUS_TOPIC_TEMPLATE, DEVICE_ID);
 
   WiFi.mode(WIFI_STA);
   WiFi.begin(WIFI_SSID, WIFI_PASS);
@@ -121,12 +97,13 @@ void setup() {
     delay(300);
   }
   Serial.printf("wifi connected, ip=%s\n", WiFi.localIP().toString().c_str());
-
-  mqtt_client.setServer(MQTT_HOST, MQTT_PORT);
-  mqtt_client.setCallback(callback);
+  server.on("/health", HTTP_GET, handle_health);
+  server.on("/punish", HTTP_GET, handle_punish);
+  server.onNotFound(handle_not_found);
+  server.begin();
+  Serial.printf("http ready: http://%s/health\n", WiFi.localIP().toString().c_str());
 }
 
 void loop() {
-  ensure_mqtt();
-  mqtt_client.loop();
+  server.handleClient();
 }

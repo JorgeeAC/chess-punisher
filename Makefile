@@ -2,7 +2,7 @@ SHELL := /bin/bash
 PY := python
 PIP := pip
 
-.PHONY: help venv install freeze smoke harness vision app probe test fw-build fw-flash fw-monitor
+.PHONY: help venv install freeze smoke harness vision app probe-http test fw-build fw-flash fw-monitor
 
 help:
 	@echo "Targets:"
@@ -13,7 +13,7 @@ help:
 	@echo "  make harness   - run interactive move harness"
 	@echo "  make vision    - run live camera preview"
 	@echo "  make app       - run app skeleton with state machine bootstrap"
-	@echo "  make probe     - run basic MQTT ESP32 connectivity probe"
+	@echo "  make probe-http - send a basic HTTP confirmation call to the ESP32"
 	@echo "  make test      - run unit tests"
 	@echo "  make fw-build  - build ESP32 firmware (PlatformIO)"
 	@echo "  make fw-flash  - flash ESP32 firmware (PORT=/dev/ttyUSB0)"
@@ -41,8 +41,8 @@ vision:
 app:
 	$(PY) -m chess_punisher.app.main
 
-probe:
-	$(PY) -m scripts.actuator_probe --mqtt-host $${MQTT_HOST:-127.0.0.1} --mqtt-port $${MQTT_PORT:-1883} --mqtt-device-id $${MQTT_DEVICE_ID:-esp32-1}
+probe-http:
+	$(PY) -m scripts.http_probe --url $${ESP_URL:-http://esp32-1.local/punish}
 
 test:
 	$(PY) -m unittest discover -s tests -p "test_*.py"
