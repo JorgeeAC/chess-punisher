@@ -1,6 +1,7 @@
 from .punisher import PunishEvent, Punisher
 from .http_probe import (
     HttpProbeResult,
+    base_url_from_target,
     build_probe_url,
     fetch_json,
     health_url_from_punish_url,
@@ -11,6 +12,7 @@ __all__ = [
     "HttpProbeResult",
     "PunishEvent",
     "Punisher",
+    "base_url_from_target",
     "build_probe_url",
     "fetch_json",
     "health_url_from_punish_url",

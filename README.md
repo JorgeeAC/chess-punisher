@@ -167,3 +167,15 @@ If your `.envrc` already exports `PUNISHER_WHITE_URL`, you can just run:
 direnv allow
 make probe-http
 ```
+
+For a very obvious visual check, send a 2-second LED pulse:
+
+```bash
+make light-test
+```
+
+Optional override:
+
+```bash
+PULSE_MS=500 make light-test
+```

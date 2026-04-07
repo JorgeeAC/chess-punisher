@@ -6,7 +6,7 @@ SRC_PATH = Path(__file__).resolve().parents[1] / "src"
 if str(SRC_PATH) not in sys.path:
     sys.path.insert(0, str(SRC_PATH))
 
-from chess_punisher.comms.http_probe import HttpProbeResult, build_probe_url
+from chess_punisher.comms.http_probe import HttpProbeResult, base_url_from_target, build_probe_url
 
 
 class HttpProbeTests(unittest.TestCase):
@@ -32,6 +32,12 @@ class HttpProbeTests(unittest.TestCase):
         payload = result.json_body()
         self.assertTrue(payload["ok"])
         self.assertEqual(payload["device_id"], "esp32-1")
+
+    def test_base_url_from_target(self) -> None:
+        self.assertEqual(
+            base_url_from_target("http://192.168.1.50/punish?severity=TEST"),
+            "http://192.168.1.50",
+        )
 
 
 if __name__ == "__main__":

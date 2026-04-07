@@ -53,6 +53,24 @@ void handle_health() {
   send_json(200, doc);
 }
 
+void handle_root() {
+  StaticJsonDocument<224> doc;
+  doc["ok"] = true;
+  doc["device_id"] = DEVICE_ID;
+  doc["health"] = "/health";
+  doc["punish"] = "/punish";
+  doc["ping"] = "/ping";
+  send_json(200, doc);
+}
+
+void handle_ping() {
+  StaticJsonDocument<128> doc;
+  doc["ok"] = true;
+  doc["pong"] = true;
+  doc["device_id"] = DEVICE_ID;
+  send_json(200, doc);
+}
+
 void handle_punish() {
   String severity = server.hasArg("severity") ? server.arg("severity") : "TEST";
   String move = server.hasArg("move") ? server.arg("move") : "";
@@ -97,7 +115,9 @@ void setup() {
     delay(300);
   }
   Serial.printf("wifi connected, ip=%s\n", WiFi.localIP().toString().c_str());
+  server.on("/", HTTP_GET, handle_root);
   server.on("/health", HTTP_GET, handle_health);
+  server.on("/ping", HTTP_GET, handle_ping);
   server.on("/punish", HTTP_GET, handle_punish);
   server.onNotFound(handle_not_found);
   server.begin();

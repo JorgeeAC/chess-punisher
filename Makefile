@@ -2,7 +2,7 @@ SHELL := /bin/bash
 PY := python
 PIP := pip
 
-.PHONY: help venv install freeze smoke harness vision app probe-http test fw-build fw-flash fw-monitor
+.PHONY: help venv install freeze smoke harness vision app probe-http light-test test fw-build fw-flash fw-monitor
 
 help:
 	@echo "Targets:"
@@ -14,6 +14,7 @@ help:
 	@echo "  make vision    - run live camera preview"
 	@echo "  make app       - run app skeleton with state machine bootstrap"
 	@echo "  make probe-http - send a basic HTTP confirmation call to the ESP32"
+	@echo "  make light-test - send a longer visible LED pulse to the ESP32"
 	@echo "  make test      - run unit tests"
 	@echo "  make fw-build  - build ESP32 firmware (PlatformIO)"
 	@echo "  make fw-flash  - flash ESP32 firmware (PORT=/dev/ttyUSB0)"
@@ -43,6 +44,14 @@ app:
 
 probe-http:
 	$(PY) -m scripts.http_probe $${ESP_URL:+--url "$$ESP_URL"}
+
+light-test:
+	$(PY) -m scripts.http_probe \
+		$${ESP_URL:+--url "$$ESP_URL"} \
+		--skip-health \
+		--severity LIGHT_TEST \
+		--move led \
+		--pulse-ms $${PULSE_MS:-2000}
 
 test:
 	$(PY) -m unittest discover -s tests -p "test_*.py"

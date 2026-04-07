@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 import json
 from urllib.parse import urlencode, urlsplit, urlunsplit
+from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 
 
@@ -19,6 +20,11 @@ class HttpProbeResult:
         if not isinstance(payload, dict):
             raise ValueError("response body must be a JSON object")
         return payload
+
+
+def base_url_from_target(url: str) -> str:
+    parts = urlsplit(url)
+    return urlunsplit((parts.scheme, parts.netloc, "", "", ""))
 
 
 def health_url_from_punish_url(url: str) -> str:
@@ -51,10 +57,14 @@ def build_probe_url(
 
 def fetch_json(url: str, timeout_s: float = 2.0) -> HttpProbeResult:
     req = Request(url, method="GET")
-    with urlopen(req, timeout=timeout_s) as response:
-        body = response.read().decode("utf-8")
-        status = getattr(response, "status", response.getcode())
-    return HttpProbeResult(status=status, url=url, body=body)
+    try:
+        with urlopen(req, timeout=timeout_s) as response:
+            body = response.read().decode("utf-8")
+            status = getattr(response, "status", response.getcode())
+        return HttpProbeResult(status=status, url=url, body=body)
+    except HTTPError as exc:
+        body = exc.read().decode("utf-8", errors="replace")
+        return HttpProbeResult(status=exc.code, url=url, body=body)
 
 
 def send_http_probe(

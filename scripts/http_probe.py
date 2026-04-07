@@ -12,7 +12,12 @@ SRC_PATH = PROJECT_ROOT / "src"
 if str(SRC_PATH) not in sys.path:
     sys.path.insert(0, str(SRC_PATH))
 
-from chess_punisher.comms.http_probe import fetch_json, health_url_from_punish_url, send_http_probe
+from chess_punisher.comms.http_probe import (
+    base_url_from_target,
+    fetch_json,
+    health_url_from_punish_url,
+    send_http_probe,
+)
 
 
 def default_url() -> str | None:
@@ -36,7 +41,24 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Skip the GET /health request and only hit /punish.",
     )
+    parser.add_argument(
+        "--discover",
+        action="store_true",
+        help="Try a few likely endpoints first and print their status codes.",
+    )
     return parser
+
+
+def print_result(label: str, result: object) -> None:
+    if isinstance(result, Exception):
+        print(f"{label}_error={result}")
+        return
+    assert hasattr(result, "status")
+    assert hasattr(result, "url")
+    assert hasattr(result, "body")
+    print(f"{label}_status={result.status}")
+    print(f"{label}_url={result.url}")
+    print(result.body)
 
 
 def main() -> int:
@@ -45,12 +67,20 @@ def main() -> int:
         print("HTTP probe failed: no URL provided. Set PUNISHER_WHITE_URL or pass --url.")
         return 1
 
+    base_url = base_url_from_target(args.url)
     try:
+        if args.discover:
+            for label, url in (
+                ("root", f"{base_url}/"),
+                ("health", health_url_from_punish_url(args.url)),
+                ("punish", args.url),
+            ):
+                result = fetch_json(url, timeout_s=args.timeout)
+                print_result(label, result)
+
         if not args.skip_health:
             health = fetch_json(health_url_from_punish_url(args.url), timeout_s=args.timeout)
-            print(f"health_status={health.status}")
-            print(f"health_url={health.url}")
-            print(health.body)
+            print_result("health", health)
 
         result = send_http_probe(
             url=args.url,
@@ -64,10 +94,8 @@ def main() -> int:
         print(f"HTTP probe failed: {exc}")
         return 1
 
-    print(f"punish_status={result.status}")
-    print(f"punish_url={result.url}")
-    print(result.body)
-    return 0
+    print_result("punish", result)
+    return 0 if result.status < 400 else 1
 
 
 if __name__ == "__main__":
