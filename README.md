@@ -152,7 +152,7 @@ The lowest-friction path in this repo is now plain HTTP:
    ```
 5. Or use the repo helper:
    ```bash
-   ESP_URL="http://<esp-ip>/punish" make probe-http
+   PUNISHER_WHITE_URL="http://<esp-ip>/punish" make probe-http
    ```
 
 What success looks like:
@@ -160,3 +160,10 @@ What success looks like:
 - The Pi gets a JSON response from `/health` and `/punish`.
 - The ESP32 serial monitor logs the request details.
 - The ESP32 briefly flashes its indicator LED on `/punish`.
+
+If your `.envrc` already exports `PUNISHER_WHITE_URL`, you can just run:
+
+```bash
+direnv allow
+make probe-http
+```

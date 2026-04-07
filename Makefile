@@ -42,7 +42,7 @@ app:
 	$(PY) -m chess_punisher.app.main
 
 probe-http:
-	$(PY) -m scripts.http_probe --url $${ESP_URL:-http://esp32-1.local/punish}
+	$(PY) -m scripts.http_probe $${ESP_URL:+--url "$$ESP_URL"}
 
 test:
 	$(PY) -m unittest discover -s tests -p "test_*.py"

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import json
-from urllib.parse import urlencode
+from urllib.parse import urlencode, urlsplit, urlunsplit
 from urllib.request import Request, urlopen
 
 
@@ -19,6 +19,16 @@ class HttpProbeResult:
         if not isinstance(payload, dict):
             raise ValueError("response body must be a JSON object")
         return payload
+
+
+def health_url_from_punish_url(url: str) -> str:
+    parts = urlsplit(url)
+    path = parts.path or "/"
+    if path.endswith("/punish"):
+        health_path = f"{path[:-7]}/health" or "/health"
+    else:
+        health_path = "/health"
+    return urlunsplit((parts.scheme, parts.netloc, health_path, "", ""))
 
 
 def build_probe_url(
@@ -39,6 +49,14 @@ def build_probe_url(
     return f"{url}?{query}"
 
 
+def fetch_json(url: str, timeout_s: float = 2.0) -> HttpProbeResult:
+    req = Request(url, method="GET")
+    with urlopen(req, timeout=timeout_s) as response:
+        body = response.read().decode("utf-8")
+        status = getattr(response, "status", response.getcode())
+    return HttpProbeResult(status=status, url=url, body=body)
+
+
 def send_http_probe(
     url: str,
     severity: str = "TEST",
@@ -54,8 +72,4 @@ def send_http_probe(
         move_uci=move_uci,
         pulse_ms=pulse_ms,
     )
-    req = Request(target, method="GET")
-    with urlopen(req, timeout=timeout_s) as response:
-        body = response.read().decode("utf-8")
-        status = getattr(response, "status", response.getcode())
-    return HttpProbeResult(status=status, url=target, body=body)
+    return fetch_json(target, timeout_s=timeout_s)
