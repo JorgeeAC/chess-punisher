@@ -2,9 +2,15 @@
 __pycache__/
 *.pyc
 .env
+.env.local
+.envrc.local
 .DS_Store
 .idea/
 .vscode/
+*.swp
+*.swo
+*~
 bin/stockfish
 .local/
 *.log
+firmware/esp32_actuator/.pio/
